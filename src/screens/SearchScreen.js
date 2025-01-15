@@ -1,17 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, FlatList, Image, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, FlatList, Image, TouchableOpacity, SafeAreaView, Keyboard } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
 import styles from '../../style.js';
 
-//SearchScreen component - Allows users to search for shows and displays trending searches
 const SearchScreen = () => {
-  // State management
+  // State for holding search query input and search results
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const navigation = useNavigation();
 
-  // Popular searches data
+  // Hardcoded list of trending searches
   const TRENDING_SEARCHES = [
     'Stranger Things',
     'Wednesday',
@@ -20,149 +19,129 @@ const SearchScreen = () => {
     'Money Heist',
   ];
 
-  //Fetches search results from the API
-  const searchMovies = useCallback(async () => {
-    if (!searchQuery.trim()) return;
+  // Function to fetch search results from TVMaze API
+  const searchMovies = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]); 
+      return;
+    }
 
     try {
       const response = await fetch(
         `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(searchQuery.trim())}`
       );
-      if (!response.ok) throw new Error('Network response was not ok');
-      
       const data = await response.json();
-      setSearchResults(data);
+      setSearchResults(data); 
     } catch (error) {
       console.error('Error searching movies:', error);
+      setSearchResults([]); 
+    }
+  };
+
+  // useEffect to trigger search when searchQuery changes
+  useEffect(() => {
+    if (searchQuery.length > 0) {
+      searchMovies();
+    } else {
       setSearchResults([]);
     }
   }, [searchQuery]);
 
-  // Search effect
-  useEffect(() => {
-    const debounceTimeout = setTimeout(() => {
-      if (searchQuery.length > 0) {
-        searchMovies();
-      } else {
-        setSearchResults([]);
-      }
-    }, 300); // Debounce search for better performance
+  // Function to render each search result item
+  const renderSearchResult = ({ item }) => (
+    <TouchableOpacity
+      style={styles.resultItem}
+      onPress={() => {
+        Keyboard.dismiss();
+        navigation.navigate('Details', { movie: item.show });
+      }}
+    >
+      <Image
+        source={{
+          uri: item.show.image?.medium || 'https://via.placeholder.com/150',
+        }}
+        style={styles.resultImage}
+      />
+      <View style={styles.resultInfo}>
+        <Text style={styles.resultTitle} numberOfLines={1}>
+          {item.show.name}
+        </Text>
+        <Text style={styles.resultGenres} numberOfLines={1}>
+          {item.show.genres?.join(' • ') || 'No genres available'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
-    return () => clearTimeout(debounceTimeout);
-  }, [searchQuery, searchMovies]);
-
-  //Renders an individual search result item
-  const renderSearchResult = ({ item }) => {
-    const { show } = item;
-    return (
-      <TouchableOpacity
-        style={styles.resultItem}
-        onPress={() => navigation.navigate('Details', { movie: show })}
-      >
-        <Image
-          source={{
-            uri: show.image?.medium || 'https://via.placeholder.com/150',
-          }}
-          style={styles.resultImage}
-        />
-        <View style={styles.resultInfo}>
-          <Text style={styles.resultTitle} numberOfLines={1}>
-            {show.name}
-          </Text>
-          <Text style={styles.resultGenres} numberOfLines={1}>
-            {show.genres?.join(' • ') || 'No genres available'}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  //Renders a trending search item
+  // Function to render each trending search item
   const renderTrendingItem = ({ item }) => (
     <TouchableOpacity
       style={styles.trendingItem}
       onPress={() => setSearchQuery(item)}
     >
-      <Icon 
-        name="trending-up" 
-        size={20} 
-        color="#E50914" 
-        style={styles.trendingIcon} 
-      />
-      <Text style={styles.trendingText} numberOfLines={1}>
-        {item}
-      </Text>
-      <Icon 
-        name="play" 
-        size={20} 
-        color="#727272" 
-        style={styles.playIcon} 
-      />
+      <Icon name="trending-up" size={20} color="#E50914" />
+      <Text style={styles.trendingText} numberOfLines={1}>{item}</Text>
+      <Icon name="play" size={20} color="#727272" />
     </TouchableOpacity>
-  );
-
-  //Renders the search header with back button and search input
-  const SearchHeader = () => (
-    <View style={styles.searchBarContainer}>
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={styles.backButtonS}
-      >
-        <Icon name="arrow-back" size={28} color="#fff" />
-      </TouchableOpacity>
-      <View style={styles.searchBar}>
-        <Icon 
-          name="search" 
-          size={20} 
-          color="#727272" 
-          style={styles.searchIcon} 
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search for a show, movie etc."
-          placeholderTextColor="#727272"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoFocus
-          returnKeyType="search"
-          onSubmitEditing={searchMovies}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity 
-            onPress={() => setSearchQuery('')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Icon name="close-circle" size={20} color="#727272" />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
   );
 
   return (
     <SafeAreaView style={styles.containerS}>
-      <SearchHeader />
-
-      {searchQuery.length === 0 ? (
-        <View style={styles.trendingContainer}>
-          <Text style={styles.trendingHeader}>Popular Searches</Text>
-          <FlatList
-            data={TRENDING_SEARCHES}
-            renderItem={renderTrendingItem}
-            keyExtractor={(item) => item}
-            showsVerticalScrollIndicator={false}
+      <View style={styles.searchBarContainer}>
+        <TouchableOpacity
+          onPress={() => {
+            Keyboard.dismiss(); 
+            navigation.goBack(); 
+          }}
+          style={styles.backButtonS}
+        >
+          <Icon name="arrow-back" size={28} color="#fff" />
+        </TouchableOpacity>
+        <View style={styles.searchBar}>
+          <Icon name="search" size={20} color="#727272" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for a show, movie etc."
+            placeholderTextColor="#727272"
+            value={searchQuery}
+            onChangeText={setSearchQuery} 
+            autoFocus
+            returnKeyType="search"
+            blurOnSubmit={false}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity 
+              onPress={() => setSearchQuery('')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon name="close-circle" size={20} color="#727272" />
+            </TouchableOpacity>
+          )}
         </View>
-      ) : (
-        <FlatList
-          data={searchResults}
-          renderItem={renderSearchResult}
-          keyExtractor={(item) => item.show.id.toString()}
-          contentContainerStyle={styles.resultsList}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
+      </View>
+
+      <View style={{ flex: 1 }}>
+        {searchQuery.length === 0 ? (
+          <View style={styles.trendingContainer}>
+            <Text style={styles.trendingHeader}>Popular Searches</Text>
+            <FlatList
+              data={TRENDING_SEARCHES} 
+              renderItem={renderTrendingItem}
+              keyExtractor={item => item}
+              keyboardShouldPersistTaps="handled" 
+            />
+          </View>
+        ) : (
+          <FlatList
+            data={searchResults} 
+            renderItem={renderSearchResult}
+            keyExtractor={item => item.show.id.toString()}
+            contentContainerStyle={styles.resultsList}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none" 
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 };
